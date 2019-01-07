@@ -20,11 +20,17 @@ import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Base64;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Surface;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
+import android.widget.TextView;
+import android.widget.Toast;
 
+import com.sxz.ai.face.utils.SharedPreferencesHelper;
 import com.tao.admin.loglib.Logger;
 
 import org.opencv.android.BaseLoaderCallback;
@@ -44,8 +50,8 @@ import java.io.InputStream;
 import java.util.Random;
 import java.util.Vector;
 
-public class OpenV1Activity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2{
-    String TAG="OpencvMainActivity";
+public class OpenV2Activity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2{
+    public static final String TAG="OpencvMainActivity";
     Bitmap bitmap;
     HairVM baiduOauthApi;
     CameraBridgeViewBase cameraView;
@@ -101,7 +107,7 @@ public class OpenV1Activity extends Activity implements CameraBridgeViewBase.CvC
 
             @Override
             public void onTokenSucc(String token) {
-                OpenV1Activity.this.token = token;
+                OpenV2Activity.this.token = token;
             }
         });
         if (!OpenCVLoader.initDebug()){
@@ -142,21 +148,7 @@ public class OpenV1Activity extends Activity implements CameraBridgeViewBase.CvC
         return result;
     }
 
-    public static Bitmap rotateBitmap(Bitmap bitmap, int degress) {
-
-    if (bitmap != null){ Matrix m = new Matrix();
-
-     m.postRotate(degress);
-    bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), m, true);
-    return bitmap;
-    }
-    return bitmap;
-
-    }
     MTCNN mtcnn;
-    private volatile boolean processing = false;
-    private Object object = new Object();
-    private boolean isP = false;
     Random random = new Random();
     int[] colors = new int[]{Color.RED,Color.GREEN,Color.rgb(255,153,102),Color.rgb(255,204,204),Color.BLUE,Color.YELLOW,Color.rgb(51,153,153)};
     private int getRandomColor(){
@@ -166,8 +158,8 @@ public class OpenV1Activity extends Activity implements CameraBridgeViewBase.CvC
     String familyName = "宋体";
     Typeface font = Typeface.create(familyName, Typeface.NORMAL);
     Paint p = new Paint();
-
-    public void processImage(final FrameData frameData){
+    private int w,h;
+    public void processImage(Bitmap bm){
         //Bitmap bm= Utils.copyBitmap(imageBitmap);
 
             /*for (int i=0;i<boxes.size();i++) {
@@ -176,17 +168,16 @@ public class OpenV1Activity extends Activity implements CameraBridgeViewBase.CvC
                 final org.opencv.core.Rect cvect = new org.opencv.core.Rect(boxes.get(i).transform2Rect().left, boxes.get(i).transform2Rect().top, boxes.get(i).transform2Rect().width(), boxes.get(i).transform2Rect().height());
                 Imgproc.rectangle(mRgba,cvect.tl(), cvect.br(), new Scalar(0, 255, 0, 255), 3);
             }*/
-        Logger.i("---->", "发现人脸:");
-      /*      Bitmap bm = Bitmap.createBitmap(frameData.getRgb().cols(), frameData.getRgb().rows(), Bitmap.Config.ARGB_8888);
+        Logger.i(TAG, "发现人脸:");
+        OpenV2Activity.this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                banner.setText("有人靠近,识别中...");
+            }
+        });
 
-           *//* if(!isP){
-                rotateBitmap(bm,90);
-            }*//*
-
-        org.opencv.android.Utils.matToBitmap(frameData.getRgb(), bm);*/
              final long startTime = System.currentTimeMillis();
-             synchronized (this) {
-                 baiduOauthApi.getFaceInfoV2(bitmapToBase64(frameData.getBitmap()), token, new OauthBack() {
+                 baiduOauthApi.getFaceInfoV2(bitmapToBase64(bm), token, new OauthBack() {
                      @Override
                      public void onOauthSucc(FaceInfo faceInfo, final Rect rect) {
 
@@ -197,10 +188,17 @@ public class OpenV1Activity extends Activity implements CameraBridgeViewBase.CvC
                          FaceInfo.Resut resut = faceInfo.getResult();
                          int i = 0;
                          if (resut != null) {
-                             FaceInfo.Face[] faces = resut.getFace_list();
+                             final FaceInfo.Face[] faces = resut.getFace_list();
                              if (faces != null && faces.length > 0) {
+                                 OpenV2Activity.this.runOnUiThread(new Runnable() {
+                                     @Override
+                                     public void run() {
+                                         banner.setText(faces[0].getGender().getType()+" "+faces[0].getAge() + "岁 "+faces[0].getFace_shape().getType() +" "+faces[0].getExpression().getType()+"---推荐的广告!");
+                                     }
+                                 });
                                  long estimatedTime = System.currentTimeMillis() - startTime;
-                                 Logger.i("---->", "识别人脸:" + faces.length + "--" + faceInfo.getError_code() + "--" + estimatedTime);
+                                 Logger.i(TAG, "识别人脸:" + faces.length + "--" + faceInfo.getError_code() + "--" + estimatedTime);
+
                                  for (FaceInfo.Face face : faces) {
                                      double[] doubles = new double[4];
                                      doubles[0] = (int) face.getLocation().getLeft();
@@ -209,8 +207,8 @@ public class OpenV1Activity extends Activity implements CameraBridgeViewBase.CvC
                                      doubles[3] = (int) face.getLocation().getHeight();
                                      org.opencv.core.Rect rect1 = new org.opencv.core.Rect();
                                      rect1.set(doubles);
-                                     Bitmap bm = Bitmap.createBitmap(frameData.getRgb().cols(), frameData.getRgb().rows(), Bitmap.Config.RGB_565);
-                                     org.opencv.android.Utils.matToBitmap(frameData.getRgb(), bm);
+                                     Bitmap bm = Bitmap.createBitmap(mRgba.cols(), mRgba.rows(), Bitmap.Config.RGB_565);
+                                     org.opencv.android.Utils.matToBitmap(mRgba, bm);
 
                                      Canvas canvasTemp = new Canvas(bm);
                                      int y = rect1.y + rect1.height;
@@ -225,25 +223,12 @@ public class OpenV1Activity extends Activity implements CameraBridgeViewBase.CvC
                                     canvasTemp.drawText(face.getFace_type().getType(),rect1.x, (float) (y+ 240), p);
                                     canvasTemp.drawText(face.getRace().getType(), rect1.x, (float) (y+ 270), p);
                                      canvasTemp.save();
-                                     org.opencv.android.Utils.bitmapToMat(bm, frameData.getRgb());
-                                     Imgproc.rectangle(frameData.getRgb(), rect1.tl(), rect1.br(), new Scalar(0, 255, 0, 255), 3);
+                                     org.opencv.android.Utils.bitmapToMat(bm, mRgba);
+                                     Imgproc.rectangle(mRgba, rect1.tl(), rect1.br(), new Scalar(0, 255, 0, 255), 3);
                                      long estimatedTime1 = System.currentTimeMillis() - startTime;
-                                     Logger.i("---->", "单次执行时长： " + estimatedTime1 + "ms");
-                              /*  Imgproc.rectangle(mRgba,detctFaceInfo.getCvrect().tl(), detctFaceInfo.getCvrect().br(), new Scalar(0, 255, 0, 255), 3);
-                                long estimatedTime = System.currentTimeMillis() - startTime;
-                                Log.d("---->","单次执行时长： " + estimatedTime + "ms");*/
-                              /*  Message message = new Message();
-                                message.what = 12;
-                                message.obj = detctFaceInfo;
-                                mHandler.sendMessage(message);*/
-                                     //processing = false;
+                                     Logger.i(TAG, "单次执行时长： " + estimatedTime1 + "ms");
+
                                  }
-                                 //rs.setText(stringBuffer);
-                              /*  Message message = new Message();
-                                message.what = 12;
-                                message.obj = faces;
-                                mHandler.sendMessage(message);
-                                processing = false;*/
                              }
                          }
                      }
@@ -254,28 +239,37 @@ public class OpenV1Activity extends Activity implements CameraBridgeViewBase.CvC
                      }
                  });
              }
-    }
     private Mat mRgba; //图像容器
     private Mat mGray;
-    private int absoluteFaceSize = 0;
-    private ImageCompare imageCompare;
     private boolean isFront = false;
+    private TextView banner,bottom;
+    private String TIME = "time";
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         this.requestWindowFeature(Window.FEATURE_NO_TITLE);
         this.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        setContentView(R.layout.activity_opencv_main);
+        setContentView(R.layout.activity_face_ad);
         baiduOauthApi = new HairVM(this);
         cameraView = findViewById(R.id.cameraView);
-        imageCompare = new ImageCompare();
-        cameraView = (CameraBridgeViewBase) findViewById(R.id.cameraView);
-        cameraView.setCameraIndex(isFront==true?1:0); //摄像头索引        -1/0：后置双摄     1：前置
+        banner = findViewById(R.id.banner);
+        bottom = findViewById(R.id.bottom);
+        WindowManager wm1 = this.getWindowManager();
+         w= wm1.getDefaultDisplay().getWidth();
+         h= wm1.getDefaultDisplay().getHeight();
+        cameraView.setCameraIndex(CameraBridgeViewBase.CAMERA_ID_ANY); //摄像头索引        -1/0：后置双摄     1：前置
         cameraView.enableFpsMeter(); //显示FPS
         cameraView.setCvCameraViewListener(this);
         p.setTypeface(font);
-        p.setTextSize(24);
+        p.setTextSize(26);
+        SharedPreferencesHelper.init(this);
+        int time = SharedPreferencesHelper.getInstance().getTime(TIME);
+        if(time>=20){
+            Toast.makeText(this,"使用超过限制,请联系我们",Toast.LENGTH_LONG).show();
+            finish();
+        }
+        SharedPreferencesHelper.getInstance().saveData(TIME,(time+1));
        mtcnn= new MTCNN(getAssets());
     }
     Mat grayscaleImage;
@@ -284,7 +278,13 @@ public class OpenV1Activity extends Activity implements CameraBridgeViewBase.CvC
         mRgba = new Mat();
         mGray = new Mat();
         grayscaleImage = new Mat(height, width, CvType.CV_8UC4);
-        absoluteFaceSize = (int)(height * 0.2);
+        FrameLayout.LayoutParams layoutParamsTop = (FrameLayout.LayoutParams) banner.getLayoutParams();
+        layoutParamsTop.height = (h-height)/2-240;
+        banner.setLayoutParams(layoutParamsTop);
+
+        FrameLayout.LayoutParams layoutParamsBottom = (FrameLayout.LayoutParams) bottom.getLayoutParams();
+        layoutParamsBottom.height = (h-height)/2-240;
+        bottom.setLayoutParams(layoutParamsBottom);
     }
 
     @Override
@@ -294,42 +294,41 @@ public class OpenV1Activity extends Activity implements CameraBridgeViewBase.CvC
         grayscaleImage.release();
     }
 
-    FrameData frameData;
     Bitmap bm;
         @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-
             mGray = inputFrame.gray(); //单通道灰度图
             mRgba = inputFrame.rgba();
-
-            if (isFront){
-                Core.flip(mRgba, mRgba, 1);//flip aroud Y-axis
+            // 旋转输入帧
+            if (cameraView.getCameraIndex() == CameraBridgeViewBase.CAMERA_ID_FRONT) {
+                Core.rotate(mRgba, mRgba, Core.ROTATE_90_COUNTERCLOCKWISE);
+                Core.rotate(mGray, mGray, Core.ROTATE_90_COUNTERCLOCKWISE);
+                Core.flip(mRgba, mRgba, 1);
                 Core.flip(mGray, mGray, 1);
-
+            } else {
+                Core.rotate(mRgba, mRgba, Core.ROTATE_90_CLOCKWISE);
+                Core.rotate(mGray, mGray, Core.ROTATE_90_CLOCKWISE);
             }
-            int rotation = cameraView.getDisplay().getRotation();
-            if (rotation == Surface.ROTATION_0) {
-                Mat rotateMat = Imgproc.getRotationMatrix2D(new Point(mRgba.rows()/2,mRgba.cols()/2), 270, 1.5);
-                Imgproc.warpAffine(mRgba, mRgba, rotateMat, mRgba.size());
-            }
-            if (!TextUtils.isEmpty(OpenV1Activity.this.token)) {
-                bm = Bitmap.createBitmap(mRgba.cols(), mRgba.rows(), Bitmap.Config.RGB_565);
-
+            if (!TextUtils.isEmpty(OpenV2Activity.this.token)) {
+                bm = Bitmap.createBitmap(mRgba.cols(), mRgba.rows(), Bitmap.Config.ARGB_8888);
                 org.opencv.android.Utils.matToBitmap(mRgba, bm);
                 Vector<Box> boxes = mtcnn.detectFaces(bm, 80);
                 if (boxes.size() < 1) {
-                    frameData = new FrameData(OpenV1Activity.START_DECT,mRgba);
+
+                    OpenV2Activity.this.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            banner.setText("广告banner区域");
+                        }
+                    });
                 }else{
-                    frameData = new FrameData(OpenV1Activity.START_DECT,mRgba);
-                    frameData.setFaceBox(boxes);
-                    frameData.setBitmap(bm);
-                    processImage(frameData);
+                    processImage(bm);
                 }
             } else {
-                frameData = new FrameData(OpenV1Activity.START_DECT, mRgba);
+
             }
 
-            return frameData.getRgb();
+            return mRgba;
 
     }
 

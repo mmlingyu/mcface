@@ -30,7 +30,6 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Toast;
 
-import com.example.vcvyc.mtcnn_new.R;
 
 import java.io.BufferedOutputStream;
 import java.io.File;

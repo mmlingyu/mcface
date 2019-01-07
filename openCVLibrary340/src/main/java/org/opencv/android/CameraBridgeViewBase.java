@@ -95,6 +95,11 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
         this.mCameraIndex = cameraIndex;
     }
 
+    public int getCameraIndex() {
+        return mCameraIndex;
+    }
+
+
     public interface CvCameraViewListener {
         /**
          * This method is invoked when camera preview has started. After this method is invoked
@@ -464,7 +469,8 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
         boolean bmpValid = true;
         if (modified != null) {
             try {
-            Utils.matToBitmap(modified, mCacheBitmap);
+                mCacheBitmap = Bitmap.createBitmap(mFrameHeight, mFrameWidth, Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(modified, mCacheBitmap);
         } catch(Exception e) {
             Log.e(TAG, "Mat type: " + modified);
             Log.e(TAG, "Bitmap type: " + mCacheBitmap.getWidth() + "*" + mCacheBitmap.getHeight());
